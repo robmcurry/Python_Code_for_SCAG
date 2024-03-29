@@ -125,6 +125,7 @@ b = {}
 for i in I:
     b[i] = random.randint(5,10)
 
+M_t = 10
 #Run the model here
 objective_value, model1_time = build_model1(I, V, V_i, T, M_t, A_all, A, d, dhat, c)
 
