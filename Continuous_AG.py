@@ -25,37 +25,6 @@ def parse_line_by_line(filename):
   with open(filename, 'r') as f:
     for line in f:
       yield line.strip()
-#      print("line ", line[0])
-
-
-
-
-
-
-#def parse_line_by_line(filename):
-#  """
-#  This function reads a file line by line, parses each line into words,
-#  and yields a list of words for each line.
-#
-#  Args:
-#      filename: The name of the file to read.
-#
-#  Yields:
-#      A list of strings representing the words in each line.
-#  """
-#  A_test = []
-#  linecount = 0;
-#  with open(filename, 'r') as f:
-#    for line in f:
-#        linecount += 1
-##        if linecount > 2:
-#        # Split the line into words and remove trailing newline
-#        words = line.strip().split()
-##            A_test.append()
-#        print(words[0])
-#        yield words
-
-
 
 def build_model0(I,V,V_i,T,M_t,A_all, A ,d,dhat, c, dbar, b):
     
@@ -179,6 +148,14 @@ def build_model1(I,V,V_i,T,M_t,A_all, A ,d,dhat,c,b):
     
 #    The y-variables
 #    Equal to 1 if attack graph i in I reaches node v in V at time t in T, and 0 otherwise
+
+#    model.y_list = pyo.VarList(domain=pyo.Binary)
+#    model.y_list = {}
+#    for i in I:
+#        for t in T:
+#            for v in V_i[i]:
+#                model.y_list[i,v,t] = pyo.Var(domain=pyo.Binary, initialize=0)
+    
     model.y = pyo.Var(I, V, T, domain=pyo.Binary)
     
 #    This is the time to reach all states
@@ -191,33 +168,32 @@ def build_model1(I,V,V_i,T,M_t,A_all, A ,d,dhat,c,b):
         return model.Theta
     model.obj = pyo.Objective(rule = obj_rule, sense = pyo.minimize)
 
-#    Defines the constraint to create Theta
-    def Theta_rule(model, i,v,t):
-        return model.Theta >= t*model.y[i,v,t]
-    model.Theta_constraint = pyo.Constraint(I,V,T, rule=Theta_rule)
 
-#    Make sure not to exceed budget
-    def budget_rule(model, i):
-        return sum(c[i,u,v]*model.y[i,v,t] for (u,v) in A[i] for t in T) <= b[i]
-    model.budget_constraint = pyo.Constraint(I, rule=budget_rule)
+    model.theta_constraints = pyo.ConstraintList()
+#    Defines the constraint to create Theta
+    for i in I:
+        for v in V_i[i]:
+            for t in T:
+                model.theta_constraints.add(model.Theta >= t*model.y[i,v,t])
+    
+#    model.budget_constraints = pyo.ConstraintList()
+##    Make sure not to exceed budget
+#    for i in I:
+#        model.budget_constraints.add(sum(c[i,u,v]*model.y[i,v,t] for (u,v) in A[i] for t in T) <= b[i])
 
 #    Make sure that all nodes are reach by some attacker
-    def reach_node_rule(model,v):
-        return sum(model.y[i,v,t] for t in T for i in I) == 1
-    model.reach_node_constraint = pyo.Constraint(V, rule=reach_node_rule)
+    model.reacr t in T for i in I if v in V_i[i]) == 1)
 
 
 #    These are the precedence constraints to make sure that all incoming exploits are completed before a node is reached
-    def precedence_rule(model, u, v, i, t):
-        
-#        Make sure that (u,v) is in A_i
-        if (u,v) in A[i]:
-        
-            return model.y[i,v,t] <= sum(model.y[k,u,p] for k in I if k != i for p in range(0,t-d[i,u,v]+1) ) + sum(model.y[i,u,p] for p in range(0,t-dhat[i,u,v]+1) )
-#        This is really just a placeholder
-        else:
-            return model.y[i,v,0] >= 0
-    model.precedence_constraint = pyo.Constraint(V, V, I, T,  rule=precedence_rule)
+    model.precedence_constraints = pyo.ConstraintList()
+    for i in I:
+        for (u,v) in A[i]:
+            for t in T:
+#                print("check")
+                model.precedence_constraints.add(model.y[i,v,t] <= sum(model.y[k,u,p] for k in I if k != i and (u,v) in A[k] for p in range(1,t-d[k,u,v]) ) + sum(model.y[i,u,p] for p in range(1,t-dhat[i,u,v]) ))
+
+    print("next")
 
 #    Declaring gurobi as the solver
     solver = pyo.SolverFactory('gurobi')
@@ -246,7 +222,6 @@ def build_model1(I,V,V_i,T,M_t,A_all, A ,d,dhat,c,b):
 
 
 
-
 ##The set of graphs/attackers
 #I = [0,1,2,3,4,5,6]
 #
@@ -270,7 +245,7 @@ def build_model1(I,V,V_i,T,M_t,A_all, A ,d,dhat,c,b):
 #V = [1,2,3,4,5]
 #
 #The list of all time periods
-T = range(0,95)
+T = range(0,120)
 #
 ##dictionary of times/durations
 #d = {}
@@ -320,7 +295,7 @@ dbar_test = {}
 c_test = {}
 
 
-for i in range(1,11):
+for i in range(1,4):
 #    print(original_string)  # Output: This was is a string
 
     I_test.append(int(i-1))
@@ -375,10 +350,10 @@ for i in range(1,11):
     
 #print(V_i_test)
 #Run the model here
-objective_value_continuous, model_time_continuous = build_model0(I_test, V_test, V_i_test, T, 130, A_test, A_i_test, d_test, dhat_test, c_test, dbar_test, b_test)
+#objective_value_continuous, model_time_continuous = build_model0(I_test, V_test, V_i_test, T, 130, A_test, A_i_test, d_test, dhat_test, c_test, dbar_test, b_test)
 
 #Run the model here
-objective_value_discrete, model_time_discrete = build_model1(I_test, V_test, V_i_test, T, 96, A_test, A_i_test, d_test, dhat_test, c_test,b_test)
+objective_value_discrete, model_time_discrete = build_model1(I_test, V_test, V_i_test, T, 130, A_test, A_i_test, d_test, dhat_test, c_test,b_test)
 
 print("discrete value = ", objective_value_discrete, " and time ", model_time_discrete)
 
